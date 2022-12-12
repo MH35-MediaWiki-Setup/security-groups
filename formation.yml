@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: MediaWiki security groups
+Parameters:
+  Vpc:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID
+Resources:
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref Vpc
+      GroupDescription: MediaWiki ALB security group
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          Description: HTTP IPv4
+        - CidrIpv6: '::/0'
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          Description: HTTP IPv6
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          Description: HTTPS IPv4
+        - CidrIpv6: '::/0'
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          Description: HTTPS IPv6
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-AlbSecurityGroup"
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref Vpc
+      GroupDescription: MediaWiki mail bounce lambda security group
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-LambdaSecurityGroup"
+  Ec2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref Vpc
+      GroupDescription: MediaWiki EC2 instance security group
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref AlbSecurityGroup
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          Description: HTTP from ALB
+        - SourceSecurityGroupId: !Ref LambdaSecurityGroup
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          Description: HTTP from Lambda
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          Description: SSH IPv4
+        - CidrIpv6: '::/0'
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          Description: SSH IPv6
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-Ec2SecurityGroup"
+  RdsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref Vpc
+      GroupDescription: MediaWiki RDS instance security group
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref Ec2SecurityGroup
+          IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          Description: MySQL from EC2
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-RdsSecurityGroup"
+  ElasticacheSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref Vpc
+      GroupDescription: MediaWiki Elasticache instance security group
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref Ec2SecurityGroup
+          IpProtocol: tcp
+          FromPort: 11211
+          ToPort: 11211
+          Description: Memcached from EC2
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ElasticacheSecurityGroup"
